@@ -1,5 +1,8 @@
 import requests, bs4
 import pandas as pd
+import psycopg2
+import configparser
+import sqlalchemy as sa
 
 # define the team owners and relevant url
 dict = {
@@ -37,9 +40,46 @@ for i in range(8):
     # first week did not have all teams, this adds a 0 for that week only for those teams
     if len(luck_temp) == 14:
         luck_temp.insert(0, 0)
+    # make all items in temp list are int
+    for g in range(15):
+        luck_temp[g] = int(luck_temp[g])  
     # put list into the empty df
     luck_df[i] = luck_temp
-# rename df columns    
+# rename df columns then make all entries numeric   
 luck_df.columns = list(dict.keys())
 
-#TO DO: scrape scores, analysis
+# create SQL connections: need two to use pd.to_sql()
+parser = configparser.ConfigParser()
+parser.read('database.ini')
+params = parser.items('postgresql')
+db = {}
+for param in params:
+    db[param[0]] = param[1]
+conn = psycopg2.connect(**db)
+cur = conn.cursor()
+
+engine = sa.create_engine('postgresql+psycopg2://user:pass@localhost/FleaFlicker')
+conn1 = engine.connect()
+
+# create table
+cur.execute(
+    """
+    CREATE TABLE IF NOT EXISTS luck (
+        index INTEGER PRIMARY KEY,
+        Nick INTEGER,
+        Mark INTEGER,
+        Sawyer INTEGER,
+        Caleb INTEGER,
+        Daniel INTEGER,
+        Metch INTEGER,
+        Tonia INTEGER,
+        Dennis INTEGER
+    )
+    """
+)
+
+luck_df.to_sql('luck', conn1, if_exists = 'replace')
+
+cur.close()
+conn.commit()
+conn.close()
